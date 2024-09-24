@@ -8,70 +8,62 @@ x-environment:
   PLAID_REDIRECT_URI: ${PLAID_REDIRECT_URI}
   PLAID_ENV: ${PLAID_ENV}
 services:
-  go:
+  hello-world:
+    image: crccheck/hello-world
+    container_name: moni
+    hostname: moni
     networks:
-      - "quickstart"
-    depends_on:
-      - "frontend"
-    build:
-      context: .
-      dockerfile: ./go/Dockerfile
-    ports: ["8000:8000"]
-    environment:
-      <<: *QUICKSTART_ENVIRONMENT
-  java:
-    networks:
-      - "quickstart"
-    depends_on:
-      - "frontend"
-    build:
-      context: .
-      dockerfile: ./java/Dockerfile
-    ports: ["8000:8000"]
-    environment:
-      <<: *QUICKSTART_ENVIRONMENT
-  node:
-    networks:
-      - "quickstart"
-    depends_on:
-      - "frontend"
-    build:
-      context: .
-      dockerfile: ./node/Dockerfile
-    ports: ["8000:8000"]
-    environment:
-      <<: *QUICKSTART_ENVIRONMENT
+      - "moni-plaid"
+    ports: [ "8001:8000" ]
   python:
+    container_name: moni-plaid-python
+    hostname: moni-plaid-python
     networks:
-      - "quickstart"
+      - "moni-plaid"
     depends_on:
       - "frontend"
     build:
       context: .
       dockerfile: ./python/Dockerfile
     ports: ["8000:8000"]
-    environment:
-      <<: *QUICKSTART_ENVIRONMENT
-  ruby:
-    networks:
-      - "quickstart"
-    depends_on:
-      - "frontend"
-    build:
-      context: .
-      dockerfile: ./ruby/Dockerfile
-    ports: ["8000:8000"]
+    volumes:
+      - type: bind
+        source: ./python
+        target: /opt/app/python
     environment:
       <<: *QUICKSTART_ENVIRONMENT
   frontend:
+    container_name: moni-plaid-frontend
+    hostname: moni-plaid-frontend
     environment:
       - REACT_APP_API_HOST
     networks:
-      - "quickstart"
+      - "moni-plaid"
     build:
       context: .
       dockerfile: ./frontend/Dockerfile
     ports: ["3000:3000"]
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared
+    container_name: moni-plaid-tunnel
+    hostname: moni-plaid-tunnel
+    restart: unless-stopped
+    command: tunnel --config /etc/tunnel-config.yml run
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./tunnel-config.yml:/etc/tunnel-config.yml
+    environment:
+      - "TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}"
+    labels:
+      # enbale watchtower updates
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - "moni-plaid"
+    links:
+      - frontend
+      - python
+      - hello-world
+
 networks:
-  quickstart:
-    name: quickstart
+  moni-plaid:
+    name: moni-plaid

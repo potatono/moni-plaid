@@ -1,0 +1,8 @@
+ingress:
+    - hostname: moni.jplt.com
+      service: http://moni:8000
+    - hostname: moni-link.jplt.com
+      service: http://moni-plaid-frontend:3000
+    - hostname: moni-bank.jplt.com
+      service: http://moni-plaid-python:8000
+    - service: http_status:404

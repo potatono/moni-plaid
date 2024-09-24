@@ -62,8 +62,14 @@ from plaid.model.cra_check_report_partner_insights_get_request import CraCheckRe
 from plaid.model.cra_pdf_add_ons import CraPDFAddOns
 from plaid.api import plaid_api
 
-load_dotenv()
+import firebase_admin
+from firebase_admin import credentials, firestore
 
+cred = credentials.Certificate("firebase-admin-key.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -130,6 +136,31 @@ user_token = None
 
 item_id = None
 
+
+@app.route('/api/store_access_token', methods=['POST'])
+def store_access_token():
+    public_token = request.form['public_token']
+    user_id = request.form['user_id']
+
+    try:
+        exchange_request = ItemPublicTokenExchangeRequest(
+            public_token=public_token)
+        exchange_response = client.item_public_token_exchange(exchange_request)
+        access_token = exchange_response['access_token']
+        item_id = exchange_response['item_id']
+    except plaid.ApiException as e:
+        return json.loads(e.body)
+
+    doc = {
+        "user_id": user_id,
+        "access_token": access_token,
+        "item_id": item_id
+    }
+    ref = (db.collection('tokens').document('services')
+        .collection('plaid').document(user_id))
+
+    ref.set(doc)
+    return jsonify(doc)
 
 @app.route('/api/info', methods=['POST'])
 def info():
@@ -207,6 +238,7 @@ def create_link_token_for_payment():
 @app.route('/api/create_link_token', methods=['POST'])
 def create_link_token():
     global user_token
+
     try:
         request = LinkTokenCreateRequest(
             products=products,
